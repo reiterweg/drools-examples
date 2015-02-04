@@ -1,0 +1,100 @@
+package com.reiterweg.drools.examples.rules;
+
+import com.reiterweg.drools.examples.dto.Client
+import com.reiterweg.drools.examples.dto.Purchase
+import com.reiterweg.drools.examples.dto.DiscountType
+import com.reiterweg.drools.examples.dto.PaymentType
+import com.reiterweg.drools.examples.helper.ScoreCardHelper
+
+import java.util.ArrayList
+
+import org.drools.core.spi.KnowledgeHelper
+
+dialect "mvel"
+dialect "java"
+
+global com.reiterweg.drools.examples.service.EmailService emailService
+
+rule "Credit card payment"
+    when
+        $purchase: Purchase(paymentType == PaymentType.CREDIT_CARD, discounts not contains DiscountType.CREDIT_CARD)
+    then
+        modify($purchase) {
+            totalDiscount += 0.0,
+            discounts.add(DiscountType.CREDIT_CARD)
+        };
+end
+
+rule "Debit card payment"
+    when
+        $purchase: Purchase(paymentType == PaymentType.DEBIT_CARD, discounts not contains DiscountType.DEBIT_CARD)
+    then
+        modify($purchase) {
+            totalDiscount += 5.0,
+            discounts.add(DiscountType.DEBIT_CARD)
+        };
+end
+
+rule "Cash payment"
+    when
+        $purchase: Purchase(paymentType == PaymentType.CASH, discounts not contains DiscountType.CASH)
+    then
+        modify($purchase) {
+            totalDiscount += 10.0,
+            discounts.add(DiscountType.CASH)
+        };
+end
+
+rule "No scorecard"
+    when
+        $client: Client(scoreCard == 0, purchases.size() >= 1)
+        $accumulate: Double() from accumulate(Purchase($subtotal: subtotal) from $client.purchases, sum($subtotal))
+        eval($accumulate >= 5000.0)
+    then
+        modify($client) {
+            scoreCard = ScoreCardHelper.generate()
+        };
+
+        emailService.sendMessage($client);
+end
+
+rule "With scorecard and is the first purchase"
+    when
+        $client: Client(scoreCard != 0, purchases.size() >= 1)
+        $purchase: Purchase(discounts not contains DiscountType.FIRST_PURCHASE) from $client.purchases.get(0)
+    then
+        $purchase.totalDiscount += 10.0;
+        $purchase.discounts.add(DiscountType.FIRST_PURCHASE);
+        insertLogical($purchase)
+end
+
+rule "With scorecard and is not the first purchase"
+    when
+        $client: Client(scoreCard != 0, purchases.size() >= 1)
+        $purchase: Purchase(discounts not contains DiscountType.FIRST_PURCHASE) from $client.purchases
+    then
+        $purchase.totalDiscount += 5.0;
+        $purchase.discounts.add(DiscountType.ANOTHER_PURCHASE);
+        insertLogical($purchase)
+end
+
+rule "Total with no discount"
+    salience -1
+    when
+        $client: Client(purchases.size() >= 1)
+        $purchase: Purchase(totalDiscount == 0.0) from $client.purchases
+    then
+        $purchase.total = $purchase.subtotal;
+        insertLogical($purchase)
+end
+
+rule "Total with discount"
+    salience -1
+    when
+        $client: Client(purchases.size() >= 1)
+        $purchase: Purchase(totalDiscount > 0.0) from $client.purchases
+    then
+        $purchase.total = $purchase.subtotal * (1 - ($purchase.totalDiscount / 100));
+        insertLogical($purchase)
+end
+
