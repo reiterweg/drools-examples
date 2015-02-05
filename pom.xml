@@ -9,7 +9,8 @@
     <packaging>pom</packaging>
     <version>1.0.0</version>
     <modules>
-        <module>programatic</module>
+        <module>programmatic</module>
+        <module>declarative</module>
     </modules>
 
     <dependencyManagement>
