@@ -19,8 +19,8 @@ public class DiscountTest {
 
     @Test
     public void withStatelessSession() {
-        StatelessKieSession kieSession = DroolsManager.createStatelessSession(DRL_PATH);
-        kieSession.setGlobal("emailService", EmailServiceImpl.getInstance());
+        StatelessKieSession kieSessionStateless = DroolsManager.createStatelessSession(DRL_PATH);
+        kieSessionStateless.setGlobal("emailService", EmailServiceImpl.getInstance());
 
         List<Client> clients = new ArrayList<Client>();
 
@@ -67,10 +67,10 @@ public class DiscountTest {
         clients.add(clientPurchasesNoScoreAffiliate);
 
         for (Client client : clients) {
-            kieSession.execute(client);
+            kieSessionStateless.execute(client);
 
             for (Purchase purchase : client.getPurchases()) {
-                kieSession.execute(purchase);
+                kieSessionStateless.execute(purchase);
             }
         }
 
@@ -119,8 +119,8 @@ public class DiscountTest {
 
     @Test
     public void withStatefulSession() {
-        KieSession kieSession = DroolsManager.createStatefulSession(DRL_PATH);
-        kieSession.setGlobal("emailService", EmailServiceImpl.getInstance());
+        KieSession kieSessionStateful = DroolsManager.createStatefulSession(DRL_PATH);
+        kieSessionStateful.setGlobal("emailService", EmailServiceImpl.getInstance());
 
         List<Client> clients = new ArrayList<Client>();
 
@@ -167,15 +167,15 @@ public class DiscountTest {
         clients.add(clientPurchasesNoScoreAffiliate);
 
         for (Client client : clients) {
-            kieSession.insert(client);
+            kieSessionStateful.insert(client);
 
             for (Purchase purchase : client.getPurchases()) {
-                kieSession.insert(purchase);
+                kieSessionStateful.insert(purchase);
             }
         }
 
-        kieSession.fireAllRules();
-        kieSession.dispose();
+        kieSessionStateful.fireAllRules();
+        kieSessionStateful.dispose();
 
         Assert.assertNotEquals(Long.valueOf(0L), clientPurchaseScoreCredit.getScoreCard());
         Assert.assertEquals(Double.valueOf(10.0), clientPurchaseScoreCredit.getPurchases().get(0).getTotalDiscount());
